@@ -14,5 +14,15 @@
         /// Кол-во вхождений буквы/пары.
         /// </summary>
         public int Count;
+
+        /// <summary>
+        /// Гласная или согласная буква/пара.
+        /// </summary>
+        public CharType LetterType;
+
+        public override string ToString()
+        {
+            return $"{Letter}: {Count}. {LetterType}";
+        }
     }
 }

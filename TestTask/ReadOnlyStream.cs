@@ -1,11 +1,20 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
+using System.Text;
 
 namespace TestTask
 {
     public class ReadOnlyStream : IReadOnlyStream
     {
         private Stream _localStream;
+        private StreamReader _sReader;
+
+        /// <summary>
+        /// Флаг окончания файла.
+        /// </summary>
+        // TODO : Заполнять данный флаг при достижении конца файла/стрима при чтении
+        // DONE : При создании - true, при успешном открытии стрима - false,
+        // при достижении конца - true
+        public bool IsEof { get; private set; }
 
         /// <summary>
         /// Конструктор класса. 
@@ -18,17 +27,16 @@ namespace TestTask
             IsEof = true;
 
             // TODO : Заменить на создание реального стрима для чтения файла!
-            _localStream = null;
+            // DONE : Открываем стрим для чтения cуществующего файла,
+            // расположенный по полному пути fileFullPath
+            if (File.Exists(fileFullPath))
+            {
+                _localStream = File.OpenRead(fileFullPath);
+                IsEof = false;
+                _sReader = new StreamReader(_localStream, Encoding.UTF8, true);
+            }
         }
-                
-        /// <summary>
-        /// Флаг окончания файла.
-        /// </summary>
-        public bool IsEof
-        {
-            get; // TODO : Заполнять данный флаг при достижении конца файла/стрима при чтении
-            private set;
-        }
+
 
         /// <summary>
         /// Ф-ция чтения следующего символа из потока.
@@ -39,22 +47,48 @@ namespace TestTask
         public char ReadNextChar()
         {
             // TODO : Необходимо считать очередной символ из _localStream
-            throw new NotImplementedException();
+            // DONE : Считываем по байтам, если достигнем EOF - бросаем исключение
+            var ch = _sReader.Read();
+            if (ch == -1)
+            {
+                IsEof = true;
+                throw new EndOfStreamException("EOF");
+            }
+            return (char)ch;
         }
 
         /// <summary>
-        /// Сбрасывает текущую позицию потока на начало.
+        /// Сбрасывает текущую позицию потока на начало, если стрим существует.
         /// </summary>
         public void ResetPositionToStart()
         {
-            if (_localStream == null)
+            if (!IfStreamExist())
             {
                 IsEof = true;
                 return;
             }
-
             _localStream.Position = 0;
             IsEof = false;
         }
+
+        /// <summary>
+        /// Корректно закрывает существующий поток. Присваивает флагу IsEof значение true.
+        /// </summary>
+        public void CloseStream()
+        {
+            IsEof = true;
+            if (!IfStreamExist())
+                return;
+            _localStream.Close();
+            _localStream = null;
+            _sReader.Close();
+            _sReader = null;
+        }
+
+        /// <summary>
+        /// Проверяет существует ли поток.
+        /// </summary>
+        /// <returns></returns>
+        private bool IfStreamExist() => _localStream != null;
     }
 }

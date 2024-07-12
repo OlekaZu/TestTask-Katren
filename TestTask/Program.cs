@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 
 namespace TestTask
 {
@@ -14,31 +16,27 @@ namespace TestTask
         /// </summary>
         /// <param name="args">Первый параметр - путь до первого файла.
         /// Второй параметр - путь до второго файла.</param>
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
-            IReadOnlyStream inputStream1 = GetInputStream(args[0]);
-            IReadOnlyStream inputStream2 = GetInputStream(args[1]);
+            IReadOnlyStream inputStream1 = new ReadOnlyStream(args[0]);
+            IReadOnlyStream inputStream2 = new ReadOnlyStream(args[1]);
 
             IList<LetterStats> singleLetterStats = FillSingleLetterStats(inputStream1);
             IList<LetterStats> doubleLetterStats = FillDoubleLetterStats(inputStream2);
 
-            RemoveCharStatsByType(singleLetterStats, CharType.Vowel);
+            RemoveCharStatsByType(singleLetterStats, CharType.Vowels);
             RemoveCharStatsByType(doubleLetterStats, CharType.Consonants);
 
             PrintStatistic(singleLetterStats);
             PrintStatistic(doubleLetterStats);
 
             // TODO : Необжодимо дождаться нажатия клавиши, прежде чем завершать выполнение программы.
-        }
-
-        /// <summary>
-        /// Ф-ция возвращает экземпляр потока с уже загруженным файлом для последующего посимвольного чтения.
-        /// </summary>
-        /// <param name="fileFullPath">Полный путь до файла для чтения</param>
-        /// <returns>Поток для последующего чтения.</returns>
-        private static IReadOnlyStream GetInputStream(string fileFullPath)
-        {
-            return new ReadOnlyStream(fileFullPath);
+            // DONE : Ждем нажатия клавиши Enter.
+            Console.Write("Press <Enter> to exit.");
+            while (Console.ReadKey().Key != ConsoleKey.Enter)
+            { }
+            inputStream1.CloseStream();
+            inputStream2.CloseStream();
         }
 
         /// <summary>
@@ -50,15 +48,25 @@ namespace TestTask
         private static IList<LetterStats> FillSingleLetterStats(IReadOnlyStream stream)
         {
             stream.ResetPositionToStart();
+            IList<LetterStats> list = new List<LetterStats>();
             while (!stream.IsEof)
             {
-                char c = stream.ReadNextChar();
-                // TODO : заполнять статистику с использованием метода IncStatistic. Учёт букв - регистрозависимый.
+                try
+                {
+                    string letter = stream.ReadNextChar().ToString();
+                    //Console.WriteLine(letter);
+                    // TODO : заполнять статистику с использованием метода IncStatistic. Учёт букв - регистрозависимый.
+                    // DONE : Проверяем русская буква или нет. Заполняем статистику, если буква уже существует в списке.
+                    // Если нет - создаем новую статистику и добавляем её в список.
+                    if (Helpers.IsRussianLetter(letter))
+                        FormStaticticList(list, letter);
+                }
+                catch (EndOfStreamException ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
             }
-
-            //return ???;
-
-            throw new NotImplementedException();
+            return list;
         }
 
         /// <summary>
@@ -71,15 +79,33 @@ namespace TestTask
         private static IList<LetterStats> FillDoubleLetterStats(IReadOnlyStream stream)
         {
             stream.ResetPositionToStart();
-            while (!stream.IsEof)
+            IList<LetterStats> list = new List<LetterStats>();
+            try
             {
-                char c = stream.ReadNextChar();
-                // TODO : заполнять статистику с использованием метода IncStatistic. Учёт букв - НЕ регистрозависимый.
+                char chPrevious = stream.ReadNextChar();
+                while (!stream.IsEof)
+                {
+                    // TODO : заполнять статистику с использованием метода IncStatistic. Учёт букв - НЕ регистрозависимый.
+                    // DONE : Проверяем парные ли буквы, проверяем русские ли буквы и заполняем статистику.
+                    char chNext = stream.ReadNextChar();
+                    if (Helpers.CompareCharsCaseIgnore(chPrevious, chNext)
+                        && Helpers.IsRussianLetter(chNext.ToString()))
+                    {
+                        var letter = chPrevious.ToString() + chNext.ToString();
+                        FormStaticticList(list, letter);
+                        chPrevious = stream.ReadNextChar();
+                    }
+                    else
+                    {
+                        chPrevious = chNext;
+                    }
+                }
             }
-
-            //return ???;
-
-            throw new NotImplementedException();
+            catch (EndOfStreamException ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            return list;
         }
 
         /// <summary>
@@ -92,18 +118,16 @@ namespace TestTask
         private static void RemoveCharStatsByType(IList<LetterStats> letters, CharType charType)
         {
             // TODO : Удалить статистику по запрошенному типу букв.
-            switch (charType)
+            // DONE : Удаляем все буквы/пары, содержащие в себе только гласные или согласные буквы.
+            for (int i = letters.Count - 1; i >= 0; --i)
             {
-                case CharType.Consonants:
-                    break;
-                case CharType.Vowel:
-                    break;
+                if (letters[i].LetterType == charType)
+                    letters.RemoveAt(i);
             }
-            
         }
 
         /// <summary>
-        /// Ф-ция выводит на экран полученную статистику в формате "{Буква} : {Кол-во}"
+        /// Ф-ция выводит на экран полученную статистику в формате "{Буква} : {Кол-во}. {Тип}"
         /// Каждая буква - с новой строки.
         /// Выводить на экран необходимо предварительно отсортировав набор по алфавиту.
         /// В конце отдельная строчка с ИТОГО, содержащая в себе общее кол-во найденных букв/пар
@@ -112,18 +136,48 @@ namespace TestTask
         private static void PrintStatistic(IEnumerable<LetterStats> letters)
         {
             // TODO : Выводить на экран статистику. Выводить предварительно отсортировав по алфавиту!
-            throw new NotImplementedException();
+            // DONE: Формат вывода "{Буква} : {Кол-во}. {Тип}" в алфавитном порядке. В конце строчка - ИТОГО.
+            Console.WriteLine("Итоговая статистика:");
+            var sorted = letters.OrderBy(x => x.Letter);
+            foreach (LetterStats letterStats in sorted)
+                Console.WriteLine(letterStats.ToString());
+            Console.WriteLine("Итого: {0}", sorted.Sum(x => x.Count));
+        }
+
+        /// <summary>
+        /// Формируем статистику по текущей букве/паре букв, добавляем её в коллекцию, 
+        /// если такой буквы в ней ещё нет или увеличиваем счётчик статистики, если коллекция
+        /// уже содержит такую статистику.
+        /// </summary>
+        /// <param name="list">Коллекция со статистиками вхождения букв/пар</param>
+        /// <param name="letter">Буква/пара букв</param>
+        private static void FormStaticticList(IList<LetterStats> list, string letter)
+        {
+            var letterStats = list.FirstOrDefault(x => x.Letter.Equals(letter));
+            if (String.IsNullOrEmpty(letterStats.Letter))
+            {
+                list.Add(new LetterStats()
+                {
+                    Letter = letter,
+                    LetterType = Helpers.DefineLetterType(letter),
+                    Count = 1
+                });
+            }
+            else
+            {
+                var index = list.IndexOf(letterStats);
+                IncStatistic(ref letterStats);
+                list[index] = letterStats;
+            }
         }
 
         /// <summary>
         /// Метод увеличивает счётчик вхождений по переданной структуре.
         /// </summary>
         /// <param name="letterStats"></param>
-        private static void IncStatistic(LetterStats letterStats)
+        private static void IncStatistic(ref LetterStats letterStats)
         {
             letterStats.Count++;
         }
-
-
     }
 }
